@@ -34,10 +34,10 @@ Nclasses = length(unique(L));
 
 # Primeira Camada (convolutiva)
 m1,n1,k1,c1=3,3,1,10; # dimensões dos filtros:
-R1 = redeConvolutiva(1/sqrt(m1*n1*k1)*(randn(m1,n1,k1,c1)), #W
+R1 = redeConvolutiva(1/sqrt(m1*n1*k1)*(randn(Float32,m1,n1,k1,c1)), #W
 						zeros(1,1,1,c1), #B
 						x -> max(x,0), #f(x) = Relu(x)
-						f -> Float64(f > 0), #f'(x)
+						f -> Float32(f > 0), #f'(x)
 						1, #Stride
 						[16,16] #Dimensões da entrada
 						);
@@ -53,14 +53,14 @@ dc2 = prod(R2.Out);
 # Terceira camada (densa):
 dc3 = 50; # Número de neurônios na primeira camada densa
 
-R3 = redeDensa(1/sqrt(dc2)*randn(dc3,dc2), # W
+R3 = redeDensa(1/sqrt(dc2)*randn(Float32,dc3,dc2), # W
                 zeros(dc3,1), # B
                 x -> 1/(1 + exp(-x)), #f(x)
                 f -> f * (1-f)); #df(x)
 
 # Quarta camada (densa):
 dc4 = Nclasses;
-R4 = redeDensa(1/sqrt(dc3)*randn(dc4,dc3), # W
+R4 = redeDensa(1/sqrt(dc3)*randn(Float32,dc4,dc3), # W
                 zeros(dc4,1), # B
                 x -> 1/(1 + exp(-x)), #f(x)
                 f -> f * (1-f)); #df(x)
@@ -98,22 +98,26 @@ function redeVolta()
     voltaDensa(R3,X2,X3,E2,E3);
 
 	# Retropropagação pela primeira camada Convolutiva:
-	#voltaConv(RC1,X1,X2,E1,E2)
+   # print(sum(E2))
+	voltaMaxPooling(R2,X1,X2,E1,E2)
+    #println(sum(E1))
+    # Retropropagação pela primeira camada Convolutiva:
+	voltaConv(R1,X0,X1,E0,E1)
 end
 
 #Inicialização da variáveis de treinamento:
-X0 = zeros(Float64,R1.In...);
-X1 = zeros(Float64,R1.Out...);
-X2 = zeros(Float64,R2.Out...);
-X3 = zeros(Float64,R3.Out);
-X4 = zeros(Float64,R4.Out);
+X0 = zeros(Float32,R1.In...);
+X1 = zeros(Float32,R1.Out...);
+X2 = zeros(Float32,R2.Out...);
+X3 = zeros(Float32,R3.Out);
+X4 = zeros(Float32,R4.Out);
 
-E0 = zeros(Float64,R1.In...);
-E1 = zeros(Float64,R1.Out...);
-E2 = zeros(Float64,R2.Out...);
-E3 = zeros(Float64,R3.Out);
-E4 = zeros(Float64,R4.Out);
-O  = zeros(Float64,R4.Out)
+E0 = zeros(Float32,R1.In...);
+E1 = zeros(Float32,R1.Out...);
+E2 = zeros(Float32,R2.Out...);
+E3 = zeros(Float32,R3.Out);
+E4 = zeros(Float32,R4.Out);
+O  = zeros(Float32,R4.Out)
 
 # Sorteio:
 aux=rand(size(X,1));
@@ -126,10 +130,10 @@ pTeste = tudo[pLimiar+1:end];
 # Medidas de desempenho
 ############################################
 Nciclos = 100;
-J=zeros(Float64,Nciclos,1);
-A = zeros(Float64,Nciclos,1);
-Jteste=zeros(Float64,Nciclos,1);
-Ateste = zeros(Float64,Nciclos,1)
+J=zeros(Float32,Nciclos,1);
+A = zeros(Float32,Nciclos,1);
+Jteste=zeros(Float32,Nciclos,1);
+Ateste = zeros(Float32,Nciclos,1)
 
 for ciclo in 1:Nciclos
 	for n in pTeste
@@ -174,7 +178,7 @@ for ciclo in 1:Nciclos
 	
 	display(pz)
 	
-	println("Ciclo: ", ciclo, " Taxa de acerto (treino): ", 100*round(A[ciclo],digits =2), "%", "\n");
-	println("Ciclo: ", ciclo, " Taxa de acerto (teste): ", 100*round(Ateste[ciclo],digits =2), "%", "\n");
+	println("Ciclo: ", ciclo, " Taxa de acerto (treino): ", 100*round(A[ciclo],digits =4), "%", "\n");
+	println("Ciclo: ", ciclo, " Taxa de acerto (teste): ", 100*round(Ateste[ciclo],digits =4), "%", "\n");
 
 end

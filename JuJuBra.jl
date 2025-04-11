@@ -1,6 +1,6 @@
 mutable struct redeDensa
-    W::Array{Float64} # permite qualquer número de dimensões
-    B::Array{Float64} # permite qualquer número de dimensões
+    W::Array{Float32} # permite qualquer número de dimensões
+    B::Array{Float32} # permite qualquer número de dimensões
     f::Function # função de ativação
     df::Function # derivada da função de ativação
 	In::Int64 #Dimensão da entrada
@@ -27,8 +27,8 @@ end
 
 
 mutable struct redeConvolutiva 
-    W::Array{Float64} # Pesos
-    B::Array{Float64} # Bias
+    W::Array{Float32} # Pesos
+    B::Array{Float32} # Bias
     f::Function # função de ativação
     df::Function # derivada da função de ativação
     S::Int64 # stride
@@ -213,8 +213,36 @@ function idaMaxPooling(R::redeMaxPooling,X,Y)
     R.pX2 = zeros(Int64,auxY)
 	for i in 1:auxY	 
         Y[i] = maximum(X[R.pX[:,i]]);
-		R.pX2[i] = argmax(X[R.pX[:,i]]); #pX2: apontador do maxPooling	
+		R.pX2[i] = R.pX[argmax(X[R.pX[:,i]]),i]; #pX2: apontador do maxPooling	
     end  
+
+end
+
+function voltaMaxPooling(R::redeMaxPooling,X,Y,EX,EY)
+	if(length(size(X)) == 2)
+		Mx,Nx = size(X)
+		Kx = 1;
+	elseif(length(size(X)) == 3)
+		Mx,Nx,Kx = size(X);
+	else
+		@warn("Atenção: incosistência de dimensões de X na função voltaMaxPooling")
+	end
+	
+
+	if(length(size(Y)) == 2)
+		My,Ny = size(Y);
+		Ky = 1;
+	elseif(length(size(Y)) == 3)
+		My,Ny,Ky = size(Y);
+	else
+		@warn("Atenção: incosistência de dimensões de Y na função voltaMaxPooling")
+	end
+
+	auxY = My*Ny*Ky; #length de y
+	EX .= zeros(size(EX)) #zera o erro da camada atual
+	for i in 1:auxY
+		EX[R.pX2[i]] +=  EY[i];
+	end
 
 end
 
@@ -283,16 +311,15 @@ function redeGenericaIda(R::Union{redeDensa, redeConvolutiva,redeMaxPooling},X,Y
 	
 end
 
+
+
 function redeGenericaVolta(R::Union{redeDensa, redeConvolutiva,redeMaxPooling},X,Y,EX,EY)
 	if isa(R,redeDensa)
 		voltaDensa(R,X,Y,EX,EY)
 	elseif isa(R,redeConvolutiva)
 		voltaConv(R,X,Y,EX,EY)
 	elseif isa(R,redeMaxPooling)
-		EY .= EY.*R.df.(Y);
-		for i in 1:length(EY)
-			EX[R.pX2[i]] = EY[i]; #Atualiza o erro da camada anterior
-		end
+		voltaMaxPooling(R,X,Y,EX,EY)
 	else
 		@warn("Atenção: tipo de rede não reconhecido na função redeGenericaVolta")
 	end
