@@ -1,0 +1,1 @@
+![Rede Neural com jujubas no lugar dos neurônios](Outros/Jujubra.png)
