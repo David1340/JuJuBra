@@ -149,7 +149,7 @@ function apontaConv(In,W,S)
 	if(length(In) == 2)
 		Mx,Nx = In
 		Kx = 1;
-	elseif(size(In) == 3)
+	elseif(length(In) == 3)
 		Mx,Nx,Kx = In;
 	else
 		@warn("Atenção: incosistência de dimensões de X na função apontaConv!")
@@ -165,7 +165,7 @@ function apontaConv(In,W,S)
 	end
 
 	if Kx != Kw
-		@warn("Atenção: número de canais de canais da convolutiva diferente do número de canais do kernel  (apontaConv)!")
+		@warn("Atenção: número de canais da camada convolutiva diferente do número de canais do kernel  (apontaConv)!")
 	end 
 	 
 	L = length(1:S:Mx-Mw+1)*length(1:S:Nx-Nw+1); #número de convoluções
@@ -181,7 +181,120 @@ function apontaConv(In,W,S)
 	return pConv
 end
 
-mutable struct redePooling
-    pX::Array{Int64} # apontador
-    p::Array{Int64} # dimensões do padding
+mutable struct redeMaxPooling
+	In::Array{Int64} #Dimensões da entrada
+	S::Int64 # stride
+	W::Array{Int64} # dimensões do Pooling
+	Out::Array{Int64} #Dimensões da saída
+	pX::Array{Int64} # apontador
+	pX2::Array{Int64} # apontador
+end
+
+# Construtor auxiliar para criar os parâmetros pX, pX2 e Out de forma automática
+
+function redeMaxPooling(In,S,W)
+	pX = apontaPooling(In,W,S);
+	Out = dimSaidaPooling(In,W,S);
+	pX2 = Array{Int64}[]
+	return redeMaxPooling(In,S,W,Out,pX,pX2)
+end
+
+function idaMaxPooling(R::redeMaxPooling,X,Y)
+    if(length(size(X)) == 2)
+        Mx,Nx = size(X)
+        Kx = 1;
+    elseif(length(size(X)) == 3)
+        Mx,Nx,Kx = size(X);
+    else
+        @warn("Atenção: incosistência de dimensões de X na função idaMaxPooling")
+    end
+
+    auxY = prod(size(Y)); #length de cada canal de Y
+    R.pX2 = zeros(Int64,auxY)
+	for i in 1:auxY	 
+        Y[i] = maximum(X[R.pX[:,i]]);
+		R.pX2[i] = argmax(X[R.pX[:,i]]); #pX2: apontador do maxPooling	
+    end  
+
+end
+
+function dimSaidaPooling(In,W,S)
+	if(length(In) == 2)
+		Mx,Nx = In
+		Kx = 1;
+	elseif(length(In) == 3)
+		Mx,Nx,Kx = In;
+	else
+		@warn("Atenção: incosistência de dimensões de X na função dimSaidaPooling")
+	end
+	if(length(W) == 2)
+		Mw,Nw = W;
+	else
+		@warn("Atenção: incosistência de dimensões de W na função dimSaidaPooling")
+	end
+
+	My=length(1:S:Mx-Mw+1);
+	Ny=length(1:S:Nx-Nw+1);
+	Ky=Kx;
+	return [My,Ny,Ky]
+end
+
+function apontaPooling(In,W,S)  
+	if(length(In) == 2)
+		Mx,Nx = In
+		Kx = 1;
+	elseif(length(In) == 3)
+		Mx,Nx,Kx = In;
+	else
+		@warn("Atenção: incosistência de dimensões de In função apontaConv!")
+	end
+
+	if(length(W) == 2)
+		Mw,Nw = W;
+	else
+		@warn("Atenção: incosistência de dimensões de W na função apontaPooling")
+	end
+	 
+	L = Kx*length(1:S:Mx-Mw+1)*length(1:S:Nx-Nw+1); #número de convoluções
+	pConv = zeros(Int64,Mw*Nw,L); 
+	aux = reshape(1:Mx*Nx*Kx,Mx,Nx,Kx); #Dada as dimensões de um matriz A cria uma matriz B cujos valores é os índices linerares da matriz A
+	cont = 1;
+	for k in 1:Kx 
+		for n in 1:S:Nx-Nw+1
+			for m in 1:S:Mx-Mw+1
+				pConv[:,cont] = aux[m:m+Mw-1,n:n+Nw-1,k][:];
+				cont += 1;
+			end
+		end
+	end
+	return pConv
+end
+
+function redeGenericaIda(R::Union{redeDensa, redeConvolutiva,redeMaxPooling},X,Y)
+	if isa(R,redeDensa)
+		idaDensa(R,X,Y)
+	elseif isa(R,redeConvolutiva)
+		idaConvolutiva(R,X,Y)
+	elseif isa(R,redeMaxPooling)
+		idaMaxPooling(R,X,Y)
+	else
+		@warn("Atenção: tipo de rede não reconhecido na função redeGenericaVolta")
+	end
+	
+end
+
+function redeGenericaVolta(R::Union{redeDensa, redeConvolutiva,redeMaxPooling},X,Y,EX,EY)
+	if isa(R,redeDensa)
+		voltaDensa(R,X,Y,EX,EY)
+	elseif isa(R,redeConvolutiva)
+		voltaConv(R,X,Y,EX,EY)
+	elseif isa(R,redeMaxPooling)
+		EY .= EY.*R.df.(Y);
+		for i in 1:length(EY)
+			EX[R.pX2[i]] = EY[i]; #Atualiza o erro da camada anterior
+		end
+	else
+		@warn("Atenção: tipo de rede não reconhecido na função redeGenericaVolta")
+	end
+	
 end

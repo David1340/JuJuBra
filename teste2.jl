@@ -42,18 +42,26 @@ R1 = redeConvolutiva(1/sqrt(m1*n1*k1)*(randn(m1,n1,k1,c1)), #W
 						[16,16] #Dimensões da entrada
 						);
 dc1 = prod(R1.Out);
-# Segunda camada (densa):
-dc2 = 50; # Número de neurônios na primeira camada densa
 
-R2 = redeDensa(1/sqrt(dc1)*randn(dc2,dc1), # W
-                zeros(dc2,1), # B
+# Segunda camada (max pooling):
+R2 = redeMaxPooling(R1.Out, #dimensões da entrada
+                    1, #Stride
+                    [2,2], #Dimensões do Pooling
+                    );
+dc2 = prod(R2.Out);
+
+# Terceira camada (densa):
+dc3 = 50; # Número de neurônios na primeira camada densa
+
+R3 = redeDensa(1/sqrt(dc2)*randn(dc3,dc2), # W
+                zeros(dc3,1), # B
                 x -> 1/(1 + exp(-x)), #f(x)
                 f -> f * (1-f)); #df(x)
 
-# Terceira camada (densa):
-dc3 = Nclasses;
-R3 = redeDensa(1/sqrt(dc2)*randn(dc3,dc2), # W
-                zeros(dc3,1), # B
+# Quarta camada (densa):
+dc4 = Nclasses;
+R4 = redeDensa(1/sqrt(dc3)*randn(dc4,dc3), # W
+                zeros(dc4,1), # B
                 x -> 1/(1 + exp(-x)), #f(x)
                 f -> f * (1-f)); #df(x)
 
@@ -64,43 +72,48 @@ function redeIda(n)
 	# Camada convolutiva (1):
 	redeGenericaIda(R1,X0,X1)
 
+    # Camada convolutiva (1):
+    redeGenericaIda(R2,X1,X2)
+
     # Camada densa (2):
-	redeGenericaIda(R2,X1,X2);
+	redeGenericaIda(R3,X2,X3);
 
 	# Camada densa (3):
-	redeGenericaIda(R3,X2,X3);
+	redeGenericaIda(R4,X3,X4);
 
     # Cálculo do erro:
     O .= 0;
     O[convert(Int32,L[n])]=1;
 
-    E3 .= (X3 .- O);
+    E4 .= (X4 .- O);
 end
 
 # Volta
 function redeVolta()
 
     # Retropropagação pela segunda camada densa:
-    redeGenericaVolta(R3,X2,X3,E2,E3);
+    voltaDensa(R4,X3,X4,E3,E4);
 
     # Retropropagação pela primeira camada densa:
-    redeGenericaVolta(R2,X1,X2,E1,E2);
+    voltaDensa(R3,X2,X3,E2,E3);
 
 	# Retropropagação pela primeira camada Convolutiva:
-	redeGenericaVolta(R1,X0,X1,E0,E1)
+	#voltaConv(RC1,X1,X2,E1,E2)
 end
 
 #Inicialização da variáveis de treinamento:
 X0 = zeros(Float64,R1.In...);
 X1 = zeros(Float64,R1.Out...);
-X2 = zeros(Float64,R2.Out);
+X2 = zeros(Float64,R2.Out...);
 X3 = zeros(Float64,R3.Out);
+X4 = zeros(Float64,R4.Out);
 
 E0 = zeros(Float64,R1.In...);
 E1 = zeros(Float64,R1.Out...);
-E2 = zeros(Float64,R2.Out);
+E2 = zeros(Float64,R2.Out...);
 E3 = zeros(Float64,R3.Out);
-O  = zeros(Float64,R3.Out)
+E4 = zeros(Float64,R4.Out);
+O  = zeros(Float64,R4.Out)
 
 # Sorteio:
 aux=rand(size(X,1));
@@ -124,8 +137,8 @@ for ciclo in 1:Nciclos
 		redeIda(n);
 
 		# Medidas de desempenho:
-		Jteste[ciclo] += sum(E3.^2)/length(E3);
-		if (argmax(O)==argmax(X3))
+		Jteste[ciclo] += sum(E4.^2)/length(E4);
+		if (argmax(O)==argmax(X4))
 			Ateste[ciclo] += 1;
 		end
 
@@ -136,8 +149,8 @@ for ciclo in 1:Nciclos
 		redeIda(n);
 
 		# Medidas de desempenho:
-		J[ciclo] += sum(E3.^2)/length(E3);
-		if (argmax(O)==argmax(X3))
+		J[ciclo] += sum(E4.^2)/length(E4);
+		if (argmax(O)==argmax(X4))
 			A[ciclo] += 1;
 		end
 		
