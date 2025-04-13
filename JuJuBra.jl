@@ -57,7 +57,7 @@ function idaConvolutiva(R::redeConvolutiva,X,Y)
     if(length(size(R.W)) == 3)
         Mw,Nw,C = size(R.W);
         Kw = 1;
-    elseif(length(size(R.W)) == 4)
+    elseif(ndims(R.W) == 4)
         Mw,Nw,Kw,Cw = size(R.W);
     else
         @warn("Atenção: incosistência de dimensões de W na função idaConvolutiva")
@@ -69,34 +69,34 @@ function idaConvolutiva(R::redeConvolutiva,X,Y)
     auxY = My*Ny; #length de cada canal de Y
     
     for canal in 1:Ky	 
-        Y[auxY*(canal-1)+1:auxY*canal] .= R.f.(X[R.pX]'*R.W[auxW*(canal-1)+1:auxW*canal] .+ R.B[canal]); 
+         Y[auxY*(canal-1)+1:auxY*canal] .= R.f.(X[R.pX]'*R.W[auxW*(canal-1)+1:auxW*canal] .+ R.B[canal]); 
     end   
 end
 
 function voltaConv(R::redeConvolutiva,X,Y,EX,EY) #X: entrada, EX: na camada atual, pX: apontador de X, Y: saída, EY: erro da saída
 	global alpha
-	if(length(size(X)) == 2)
+	if(ndims(X) == 2)
 		Mx,Nx = size(X)
 		Kx = 1;
-	elseif(length(size(X)) == 3)
+	elseif(ndims(X) == 3)
 		Mx,Nx,Kx = size(X);
 	else
 		@warn("Atenção: incosistência de dimensões de X na função VvltaConv!")
 	end
 	
-	if(length(size(R.W)) == 3)
+	if(ndims(R.W) == 3)
 		Mw,Nw,C = size(R.W);
 		Kw = 1;
-	elseif(length(size(R.W)) == 4)
+	elseif(ndims(R.W) == 4)
 		Mw,Nw,Kw,Cw = size(R.W);
 	else
 		@warn("Atenção: incosistência de dimensões de W na função voltaConv!")
 	end
 	EY .= EY.*R.df.(Y);
-	if(length(size(Y)) == 2)
+	if(ndims(Y) == 2)
 		My,Ny = size(Y);
 		Ky = 1;
-	elseif(length(size(Y)) == 3)
+	elseif(ndims(Y) == 3)
 		My,Ny,Ky = size(Y);
 	else
 		@warn("Atenção: incosistência de dimensões de Y na função voltaConv!")
@@ -113,8 +113,8 @@ function voltaConv(R::redeConvolutiva,X,Y,EX,EY) #X: entrada, EX: na camada atua
 		auxEa += R.W[auxW*(canal -1)+1:auxW*canal]*EY[auxY*(canal -1)+1:auxY*canal]'; #Atualiza o erro da camada anterior
 	end
 	EX .= zeros(size(X)); #Zera o erro da camada atual
-	for i in unique(R.pX)
-		EX[i] = sum(auxEa[R.pX .== i]); #Atualiza o erro da camada anterior
+	for (index, value) in enumerate(R.pX)
+		EX[value] += auxEa[index]
 	end
 
 end
@@ -200,10 +200,10 @@ function redeMaxPooling(In,S,W)
 end
 
 function idaMaxPooling(R::redeMaxPooling,X,Y)
-    if(length(size(X)) == 2)
+    if(ndims(X) == 2)
         Mx,Nx = size(X)
         Kx = 1;
-    elseif(length(size(X)) == 3)
+    elseif(ndims(X) == 3)
         Mx,Nx,Kx = size(X);
     else
         @warn("Atenção: incosistência de dimensões de X na função idaMaxPooling")
@@ -212,27 +212,30 @@ function idaMaxPooling(R::redeMaxPooling,X,Y)
     auxY = prod(size(Y)); #length de cada canal de Y
     R.pX2 = zeros(Int64,auxY)
 	for i in 1:auxY	 
-        Y[i] = maximum(X[R.pX[:,i]]);
-		R.pX2[i] = R.pX[argmax(X[R.pX[:,i]]),i]; #pX2: apontador do maxPooling	
+		indices = R.pX[:,i];
+		valoresX = X[indices];
+		max_idx = findmax(valoresX); # retorna (valor, índice)
+        Y[i] = max_idx[1];
+		R.pX2[i] = indices[max_idx[2]]; #pX2: apontador do maxPooling	
     end  
 
 end
 
 function voltaMaxPooling(R::redeMaxPooling,X,Y,EX,EY)
-	if(length(size(X)) == 2)
+	if(ndims(X) == 2)
 		Mx,Nx = size(X)
 		Kx = 1;
-	elseif(length(size(X)) == 3)
+	elseif(ndims(X) == 3)
 		Mx,Nx,Kx = size(X);
 	else
 		@warn("Atenção: incosistência de dimensões de X na função voltaMaxPooling")
 	end
 	
 
-	if(length(size(Y)) == 2)
+	if(ndims(Y) == 2)
 		My,Ny = size(Y);
 		Ky = 1;
-	elseif(length(size(Y)) == 3)
+	elseif(ndims(Y) == 3)
 		My,Ny,Ky = size(Y);
 	else
 		@warn("Atenção: incosistência de dimensões de Y na função voltaMaxPooling")
