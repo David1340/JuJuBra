@@ -37,8 +37,12 @@ X=(1/maximum(abs.(X)))*X;
 X = [X; X2];
 L = [L; L2];
 
-# Gradiente estocástico simples
-alpha = 0.001;
+# Gradiente estocástico simples com Adam
+alpha = 0.01;
+t = 0;
+beta1 = 0.95;#0.9;
+beta2 = 0.98;#0.999;
+AdamEpsilon = 1e-8;
 
 # Dimensões das camadas:
 Nclasses = length(unique(L));
@@ -140,19 +144,14 @@ end
 
 # Volta
 function redeVolta()
-
-    # Retropropagação pela segunda camada densa:
+	global t
+	t += 1;
 	redeGenericaVolta(R7,X6,X7,E6,E7);
 	redeGenericaVolta(R6,X5,X6,E5,E6);
 	redeGenericaVolta(R5,X4,X5,E4,E5);
     redeGenericaVolta(R4,X3,X4,E3,E4);
-
-    # Retropropagação pela primeira camada densa:
     redeGenericaVolta(R3,X2,X3,E2,E3);
-
-	# Retropropagação pela primeira camada Convolutiva:
 	redeGenericaVolta(R2,X1,X2,E1,E2)
-    # Retropropagação pela primeira camada Convolutiva:
 	redeGenericaVolta(R1,X0,X1,E0,E1)
 end
 
