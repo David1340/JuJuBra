@@ -59,8 +59,8 @@ R2 = redeDensa(1/sqrt(dc1)*randn(Float32,dc2,dc1), # W
 dc3 = Nclasses;
 R3 = redeDensa(1/sqrt(dc2)*randn(Float32,dc3,dc2), # W
                 zeros(dc3,1), # B
-                x -> 1/(1 + exp(-x)), #f(x)
-                f -> f * (1-f)); #df(x)
+                x -> x, #f(x)
+                f -> 1); #df(x)
 
 # Ida
 function redeIda(n)
@@ -75,17 +75,21 @@ function redeIda(n)
 	# Camada densa (3):
 	redeGenericaIda(R3,X2,X3);
 
+	idaSoftmax(X3,X4);
+
+
     # Cálculo do erro:
     O .= 0;
     O[convert(Int32,L[n])]=1;
 
-    E3 .= (X3 .- O);
+    E4 .= (X4 .- O);
 end
 
 # Volta
 function redeVolta()
 	global t
 	t += 1;
+	voltaSoftmax(E3,E4);
     # Retropropagação pela segunda camada densa:
     redeGenericaVolta2(R3,X2,X3,E2,E3);
 
@@ -101,11 +105,13 @@ X0 = zeros(Float32,R1.In...);
 X1 = zeros(Float32,R1.Out...);
 X2 = zeros(Float32,R2.Out);
 X3 = zeros(Float32,R3.Out);
+X4 = zeros(Float32,size(X3));
 
 E0 = zeros(Float32,R1.In...);
 E1 = zeros(Float32,R1.Out...);
 E2 = zeros(Float32,R2.Out);
 E3 = zeros(Float32,R3.Out);
+E4 = zeros(Float32,size(E3));
 O  = zeros(Float32,R3.Out)
 
 # Sorteio:
@@ -118,7 +124,7 @@ pTeste = tudo[pLimiar+1:end];
 ############################################
 # Medidas de desempenho
 ############################################
-Nciclos = 100;
+Nciclos = 25;
 J=zeros(Float32,Nciclos,1);
 A = zeros(Float32,Nciclos,1);
 Jteste=zeros(Float32,Nciclos,1);
@@ -130,8 +136,11 @@ for ciclo in 1:Nciclos
 		redeIda(n);
 
 		# Medidas de desempenho:
-		Jteste[ciclo] += sum(E3.^2)/length(E3);
-		if (argmax(O)==argmax(X3))
+		eps = 1e-12
+
+		Jteste[ciclo] += -sum(O.*log2.(X4 .+eps))/length(X4); 
+		
+		if (argmax(O)==argmax(X4))
 			Ateste[ciclo] += 1;
 		end
 
@@ -142,8 +151,9 @@ for ciclo in 1:Nciclos
 		redeIda(n);
 
 		# Medidas de desempenho:
-		J[ciclo] += sum(E3.^2)/length(E3);
-		if (argmax(O)==argmax(X3))
+		eps = 1e-12
+		J[ciclo] += -sum(O.*log2.(X4 .+eps))/length(X4);
+		if (argmax(O)==argmax(X4))
 			A[ciclo] += 1;
 		end
 		

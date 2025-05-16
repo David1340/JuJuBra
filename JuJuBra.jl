@@ -439,3 +439,12 @@ function redeGenericaVolta2(R::Union{redeDensa, redeConvolutiva,redeMaxPooling},
 	end
 	
 end
+
+function idaSoftmax(X,Y)
+	Y .= exp.(X);
+	Y .=  Y./ sum(Y)
+end
+
+function voltaSoftmax(EX,EY)
+	EX .= EY
+end
