@@ -38,7 +38,7 @@ X = [X; X2];
 L = [L; L2];
 
 # Gradiente estocástico simples com Adam
-alpha = 0.01;
+alpha = 0.001;
 t = 0;
 beta1 = 0.95;#0.9;
 beta2 = 0.98;#0.999;
@@ -108,8 +108,8 @@ R6 = redeDensa(1/sqrt(dc6)*randn(Float32,dc6,dc5), # W
 dc7 = Nclasses;
 R7 = redeDensa(1/sqrt(dc7)*randn(Float32,dc7,dc6), # W
                 zeros(dc7,1), # B
-                x -> 1/(1 + exp(-x)), #f(x)
-                f -> f * (1-f)); #df(x)
+                x -> x, #f(x)
+                f -> 1); #df(x)
 
 # Ida
 function redeIda(n)
@@ -135,17 +135,20 @@ function redeIda(n)
 
 	redeGenericaIda(R7,X6,X7);
 
+	idaSoftmax(X7,X8);
+
     # Cálculo do erro:
     O .= 0;
     O[convert(Int32,L[n])]=1;
 
-    E7 .= (X7 .- O);
+    E8 .= (X8 .- O);
 end
 
 # Volta
 function redeVolta()
 	global t
 	t += 1;
+	voltaSoftmax(E7,E8)
 	redeGenericaVolta(R7,X6,X7,E6,E7);
 	redeGenericaVolta(R6,X5,X6,E5,E6);
 	redeGenericaVolta(R5,X4,X5,E4,E5);
@@ -164,6 +167,7 @@ X4 = zeros(Float32,R4.Out...);
 X5 = zeros(Float32,R5.Out);
 X6 = zeros(Float32,R6.Out);
 X7 = zeros(Float32,R7.Out);
+X8 = zeros(Float32,size(X7))
 
 E0 = zeros(Float32,R1.In...);
 E1 = zeros(Float32,R1.Out...);
@@ -173,11 +177,11 @@ E4 = zeros(Float32,R4.Out...);
 E5 = zeros(Float32,R5.Out);
 E6 = zeros(Float32,R6.Out);
 E7 = zeros(Float32,R7.Out);
+E8 = zeros(Float32,size(E7))
 O  = zeros(Float32,R7.Out)
 
 # Sorteio:
-aux=rand(size(X,1));
-#tudo=sortperm(aux);
+
 tudo = 1:size(X,1);
 #pLimiar = round(Int32,size(X,1)*0.7);
 pLimiar = qnt;
@@ -194,13 +198,17 @@ Jteste=zeros(Float32,Nciclos,1);
 Ateste = zeros(Float32,Nciclos,1)
 
 for ciclo in 1:Nciclos
+	global pTreino
+	aux=rand(length(pTreino));
+	pTreino=sortperm(aux);
 	for n in pTeste
 
 		redeIda(n);
 
 		# Medidas de desempenho:
-		Jteste[ciclo] += sum(E7.^2)/length(E7);
-		if (argmax(O)==argmax(X7))
+		eps = 1e-12
+		Jteste[ciclo] += -sum(O.*log2.(X8 .+eps))/length(X8);
+		if (argmax(O)==argmax(X8))
 			Ateste[ciclo] += 1;
 		end
 
@@ -211,8 +219,9 @@ for ciclo in 1:Nciclos
 		redeIda(n);
 
 		# Medidas de desempenho:
-		J[ciclo] += sum(E7.^2)/length(E7);
-		if (argmax(O)==argmax(X7))
+		eps = 1e-12
+		J[ciclo] += -sum(O.*log2.(X8 .+eps))/length(X8);
+		if (argmax(O)==argmax(X8))
 			A[ciclo] += 1;
 		end
 		
@@ -226,8 +235,8 @@ for ciclo in 1:Nciclos
 	Jteste[ciclo] = Jteste[ciclo]/length(pTeste);
 	Ateste[ciclo] = Ateste[ciclo]/length(pTeste);
 	
-	pJ=plot(J, label = "EQM train");
-	pJt=plot!(Jteste, label = "EQM test");
+	pJ=plot(J, label = "Loss train");
+	pJt=plot!(Jteste, label = "Loss test");
 	
 	pA=plot(A,label ="Acuraccy train");
 	pAt=plot!(Ateste, label = "Acuraccy test");
