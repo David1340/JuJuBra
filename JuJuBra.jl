@@ -399,6 +399,88 @@ function apontaPooling(In,W,S)
 	return pConv
 end
 
+struct redeConvolutivaT 
+    W::Array{Float32} # Pesos
+    B::Array{Float32} # Bias
+    f::Function # função de ativação
+    df::Function # derivada da função de ativação
+    S::Int64 # stride
+	In::Array{Int64} #Dimensões da entrada
+	Out::Array{Int64} #Dimensões da saída
+	pY::Array{Int64} # apontador
+	m1W::Array{Float32}
+    m1B::Array{Float32}    
+	m2W::Array{Float32} 
+    m2B::Array{Float32}
+end
+
+
+function redeConvolutivaT(W,f,df,S,In)
+	if(In[3] != size(W,4))
+		@warn("Número de camadas da entrada deveria seria igual ao número de filtros")
+		return []
+	end
+	## Cálculo de Out
+	Out = [(In[1]-1)*S + size(W,1), (In[2]-1)*S + size(W,2),size(W,3)]
+	## Criando B
+	B = zeros(Float32,Out...)
+	## Criando pY
+	L = In[1]*In[2]; #número de operações
+	pY = zeros(prod(size(W)[1:3]),L)
+	aux = reshape(1:prod(Out),Out...);
+	cont = 1;
+	Mw = size(W,1)
+	Nw = size(W,2)
+	for m in 1:S:Out[1]-Mw+1
+	  for n in 1:S:Out[2]-Nw+1
+		pY[:,cont] = aux[m:m+Mw-1,n:n+Nw-1,:][:];
+		cont += 1;
+	  end
+	end
+	## Criando os momentos
+	m1W = zeros(Float32,size(W))
+	m1B = zeros(Float32,size(B))
+	m2W = zeros(Float32,size(W))
+	m2B = zeros(Float32,size(B)) 
+	return redeConvolutivaT(W,B,f,df,S,In,Out,pY,m1W,m1B,m2W,m2B);
+
+end
+
+function idaConvolutivaT(R::redeConvolutivaT,X,Y)
+	if(size(R.W,4) != size(X,3))
+		@warn("Número de camadas da entrada deveria seria igual ao número de filtros")
+	end
+	auxX = R.In[1]*R.In[2];
+	Y .= 0.0;
+    for k = 1:size(R.W,4)
+		for i = 1:auxX
+			Y[R.pY[:,i]] .+= X[i + (k-1)*auxX] * R.W[:,:,:,k][:]
+		end
+	end
+	Y .= R.f.(Y .+ R.B);  
+end
+
+function voltaConvolutivaT(R::redeConvolutivaT,X,Y,EX,EY)
+	global alpha
+	if(size(R.W,4) != size(X,3))
+		@warn("Número de camadas da entrada deveria seria igual ao número de filtros")
+	end
+	EY = EY.*R.df.(Y);
+	R.B .+= -alpha*EY; # B = B - alpha*EY
+	auxX = R.In[1]*R.In[2];
+	gW = zeros(Float32,size(R.W))
+	auxW = size(R.W)[1:3]
+	EX .= 0.0;
+    for k = 1:size(R.W,4)
+		for i = 1:auxX
+			gW[:,:,:,k] .+= X[i + (k-1)*auxX]*reshape(EY[R.pY[:,i]],auxW)
+
+			EX[i + (k-1)*auxX] += R.W[:,:,:,k][:]'* EY[R.pY[:,i]];
+		end
+	end 
+	R.W .+= -alpha*gW;
+end
+
 function redeGenericaIda(R::Union{redeDensa, redeConvolutiva,redeMaxPooling},X,Y)
 	if isa(R,redeDensa)
 		idaDensa(R,X,Y)
